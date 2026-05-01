@@ -1,0 +1,78 @@
+# config.yaml — Gas Relayer configuration
+# Environment variables override these values.
+# Prefix env vars with RELAYER__ (double underscore as separator)
+# e.g. RELAYER__SERVER__PORT=9090
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  allowed_origins:
+    - "https://yourdapp.com"
+    - "https://app.yourdapp.com"
+  max_body_size: 1048576  # 1MB
+
+chains:
+  # Ethereum Mainnet
+  - chain_id: 1
+    name: "Ethereum Mainnet"
+    rpc_url: "https://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
+    ws_url: "wss://eth-mainnet.g.alchemy.com/v2/YOUR_KEY"
+    forwarder_address: "0xYOUR_MAINNET_FORWARDER"
+    domain_name: "MyDAppRelayer"
+    domain_version: "1"
+    max_gas_price_gwei: 150     # circuit breaker
+    confirmations: 2
+    confirmation_timeout_secs: 180
+
+  # Polygon PoS
+  - chain_id: 137
+    name: "Polygon"
+    rpc_url: "https://polygon-mainnet.g.alchemy.com/v2/YOUR_KEY"
+    ws_url: "wss://polygon-mainnet.g.alchemy.com/v2/YOUR_KEY"
+    forwarder_address: "0xYOUR_POLYGON_FORWARDER"
+    domain_name: "MyDAppRelayer"
+    domain_version: "1"
+    max_gas_price_gwei: 800
+    confirmations: 5
+    confirmation_timeout_secs: 60
+
+  # Base
+  - chain_id: 8453
+    name: "Base"
+    rpc_url: "https://base-mainnet.g.alchemy.com/v2/YOUR_KEY"
+    forwarder_address: "0xYOUR_BASE_FORWARDER"
+    domain_name: "MyDAppRelayer"
+    domain_version: "1"
+    max_gas_price_gwei: 50
+    confirmations: 3
+    confirmation_timeout_secs: 60
+
+  # Local dev (Anvil)
+  - chain_id: 31337
+    name: "Local Anvil"
+    rpc_url: "http://localhost:8545"
+    forwarder_address: "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+    domain_name: "TestRelayer"
+    domain_version: "1"
+    max_gas_price_gwei: 9999
+    confirmations: 1
+    confirmation_timeout_secs: 30
+
+relayer:
+  # In production: leave empty and use KMS_KEY_ARN or VAULT_KEY_PATH
+  # private_key: set via RELAYER_PRIVATE_KEY env var
+  worker_count: 4
+  queue_capacity: 1000
+
+database:
+  url: "postgresql://relayer:relayer@localhost:5432/gas_relayer"
+  max_connections: 20
+  min_connections: 2
+
+redis:
+  url: "redis://localhost:6379"
+
+policy:
+  default_daily_gas_quota: 5000000       # 5M gas units per user per day
+  default_max_gas_per_request: 500000    # 500k max per single request
+  default_rate_limit_per_minute: 10      # 10 requests per user per minute

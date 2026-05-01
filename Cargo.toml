@@ -1,0 +1,81 @@
+[package]
+name = "gas-relayer"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Team"]
+description = "Production-grade ERC-2771 meta-transaction gas relayer"
+
+[[bin]]
+name = "gas-relayer"
+path = "src/main.rs"
+
+[dependencies]
+# Async runtime
+tokio = { version = "1.36", features = ["full"] }
+
+# Web framework
+axum = { version = "0.7", features = ["macros"] }
+tower = { version = "0.4", features = ["full"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "limit"] }
+
+# Ethereum
+alloy = { version = "0.1", default-features = false, features = ["full", "reqwest-rustls-tls"] }
+hex-literal = "0.4"
+
+# Serialization
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# Database
+sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+
+# Redis (queue + rate limiting)
+redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+
+# Tracing / logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
+tracing-opentelemetry = "0.22"
+
+# Error handling
+thiserror = "1.0"
+anyhow = "1.0"
+
+# Configuration
+config = "0.14"
+dotenvy = "0.15"
+
+# Validation
+validator = { version = "0.18", features = ["derive"] }
+
+# Crypto
+k256 = { version = "0.13", features = ["ecdsa"] }
+sha3 = "0.10"
+hex = "0.4"
+
+# HTTP client (for RPC)
+reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
+
+# UUID & time
+uuid = { version = "1.7", features = ["v4", "serde"] }
+chrono = { version = "0.4", features = ["serde"] }
+async-trait = "0.1"
+url = "2.5"
+
+# Concurrency primitives
+dashmap = "5.5"
+tokio-util = "0.7"
+
+# Metrics
+prometheus = "0.13"
+axum-prometheus = "0.6"
+
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+axum-test = "16.0.0"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1

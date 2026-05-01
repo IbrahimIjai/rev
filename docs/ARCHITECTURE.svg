@@ -1,0 +1,213 @@
+<svg width="100%" viewBox="0 0 680 920" role="img" xmlns="http://www.w3.org/2000/svg" style="font-family: sans-serif; background: #fff;">
+<title>Gas Relayer — Full System Architecture</title>
+<desc>Architecture showing the full request flow from dApp client through the Rust relayer (API, validation, queue, executor) to the blockchain via MinimalForwarder, with PostgreSQL, Redis, and KMS as supporting infrastructure.</desc>
+<defs>
+<marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+<path d="M2 1L8 5L2 9" fill="none" stroke="context-stroke" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+</marker>
+</defs>
+
+<!-- Palette constants (hard-coded for standalone SVG) -->
+<!-- teal: fill=#E1F5EE stroke=#0F6E56 text=#085041 -->
+<!-- purple: fill=#EEEDFE stroke=#534AB7 text=#3C3489 -->
+<!-- coral: fill=#FAECE7 stroke=#993C1D text=#712B13 -->
+<!-- amber: fill=#FAEEDA stroke=#BA7517 text=#854F0B -->
+<!-- blue: fill=#E6F1FB stroke=#185FA5 text=#0C447C -->
+<!-- green: fill=#EAF3DE stroke=#3B6D11 text=#27500A -->
+<!-- gray: fill=#F1EFE8 stroke=#5F5E5A text=#444441 -->
+
+<!-- CLIENT LAYER -->
+<rect x="30" y="20" width="620" height="76" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="35" fill="#888780">client layer</text>
+
+<rect x="80" y="38" width="140" height="48" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="150" y="60" text-anchor="middle" fill="#085041">dApp frontend</text>
+<text font-size="12" x="150" y="76" text-anchor="middle" fill="#0F6E56">Nuxt.js + ethers.js</text>
+
+<rect x="270" y="38" width="150" height="48" rx="8" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="345" y="60" text-anchor="middle" fill="#085041">User wallet</text>
+<text font-size="12" x="345" y="76" text-anchor="middle" fill="#0F6E56">MetaMask / WalletConnect</text>
+
+<rect x="470" y="38" width="150" height="48" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="545" y="60" text-anchor="middle" fill="#444441">eth_signTypedData</text>
+<text font-size="12" x="545" y="76" text-anchor="middle" fill="#5F5E5A">EIP-712 signature</text>
+
+<line x1="220" y1="62" x2="268" y2="62" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="420" y1="62" x2="468" y2="62" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text font-size="11" x="244" y="55" text-anchor="middle" fill="#888780">1</text>
+<text font-size="11" x="444" y="55" text-anchor="middle" fill="#888780">2</text>
+
+<line x1="150" y1="86" x2="150" y2="148" stroke="#0F6E56" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text font-size="11" x="158" y="122" fill="#888780">3. POST /relay</text>
+
+<!-- API LAYER -->
+<rect x="30" y="148" width="620" height="60" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="162" fill="#888780">api layer — axum (tokio)</text>
+
+<rect x="80" y="160" width="174" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="167" y="178" text-anchor="middle" fill="#3C3489">HTTP handlers</text>
+<text font-size="12" x="167" y="193" text-anchor="middle" fill="#534AB7">CORS · rate limit · body limit</text>
+
+<rect x="280" y="160" width="120" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="340" y="175" text-anchor="middle" fill="#3C3489">Auth middleware</text>
+<text font-size="12" x="340" y="190" text-anchor="middle" fill="#534AB7">API key hash check</text>
+
+<rect x="430" y="160" width="130" height="40" rx="8" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="495" y="175" text-anchor="middle" fill="#3C3489">Tracing layer</text>
+<text font-size="12" x="495" y="190" text-anchor="middle" fill="#534AB7">Structured JSON logs</text>
+
+<line x1="150" y1="200" x2="150" y2="244" stroke="#534AB7" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- VALIDATION LAYER -->
+<rect x="30" y="244" width="620" height="76" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="259" fill="#888780">validation layer</text>
+
+<rect x="50" y="260" width="146" height="52" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="123" y="279" text-anchor="middle" fill="#712B13">EIP-712 verifier</text>
+<text font-size="12" x="123" y="296" text-anchor="middle" fill="#993C1D">Domain sep · sig recovery</text>
+
+<rect x="220" y="260" width="136" height="52" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="288" y="279" text-anchor="middle" fill="#712B13">Policy engine</text>
+<text font-size="12" x="288" y="296" text-anchor="middle" fill="#993C1D">Allowlist · quota · gas</text>
+
+<rect x="376" y="260" width="132" height="52" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="442" y="279" text-anchor="middle" fill="#712B13">Nonce validator</text>
+<text font-size="12" x="442" y="296" text-anchor="middle" fill="#993C1D">Forwarder contract RPC</text>
+
+<rect x="530" y="260" width="112" height="52" rx="8" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="586" y="279" text-anchor="middle" fill="#712B13">Deadline check</text>
+<text font-size="12" x="586" y="296" text-anchor="middle" fill="#993C1D">Timestamp expiry</text>
+
+<line x1="196" y1="286" x2="218" y2="286" stroke="#993C1D" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="356" y1="286" x2="374" y2="286" stroke="#993C1D" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="508" y1="286" x2="528" y2="286" stroke="#993C1D" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<line x1="150" y1="312" x2="150" y2="368" stroke="#993C1D" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text font-size="11" x="158" y="345" fill="#888780">4. enqueue job</text>
+
+<!-- QUEUE LAYER -->
+<rect x="30" y="368" width="620" height="64" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="382" fill="#888780">queue layer</text>
+
+<rect x="50" y="380" width="148" height="44" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="124" y="396" text-anchor="middle" fill="#854F0B">In-memory queue</text>
+<text font-size="12" x="124" y="412" text-anchor="middle" fill="#BA7517">tokio mpsc channel</text>
+
+<rect x="220" y="380" width="148" height="44" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="294" y="396" text-anchor="middle" fill="#854F0B">Worker pool</text>
+<text font-size="12" x="294" y="412" text-anchor="middle" fill="#BA7517">4 concurrent workers</text>
+
+<rect x="390" y="380" width="148" height="44" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="464" y="396" text-anchor="middle" fill="#854F0B">Retry scheduler</text>
+<text font-size="12" x="464" y="412" text-anchor="middle" fill="#BA7517">Exponential backoff · 3 retries</text>
+
+<rect x="556" y="380" width="84" height="44" rx="8" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="598" y="396" text-anchor="middle" fill="#854F0B">Dead letter</text>
+<text font-size="12" x="598" y="412" text-anchor="middle" fill="#BA7517">Permanent fails</text>
+
+<line x1="198" y1="402" x2="218" y2="402" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="368" y1="402" x2="388" y2="402" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="538" y1="402" x2="554" y2="402" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<line x1="294" y1="424" x2="294" y2="476" stroke="#BA7517" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- EXECUTOR LAYER -->
+<rect x="30" y="476" width="620" height="64" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="490" fill="#888780">executor layer</text>
+
+<rect x="50" y="488" width="132" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="116" y="504" text-anchor="middle" fill="#0C447C">Nonce manager</text>
+<text font-size="12" x="116" y="520" text-anchor="middle" fill="#185FA5">Atomic nonce allocation</text>
+
+<rect x="202" y="488" width="132" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="268" y="504" text-anchor="middle" fill="#0C447C">Gas estimator</text>
+<text font-size="12" x="268" y="520" text-anchor="middle" fill="#185FA5">20% buffer · circuit breaker</text>
+
+<rect x="354" y="488" width="132" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="420" y="504" text-anchor="middle" fill="#0C447C">Tx builder</text>
+<text font-size="12" x="420" y="520" text-anchor="middle" fill="#185FA5">EIP-1559 · ABI encode</text>
+
+<rect x="506" y="488" width="130" height="44" rx="8" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="571" y="504" text-anchor="middle" fill="#0C447C">Key manager</text>
+<text font-size="12" x="571" y="520" text-anchor="middle" fill="#185FA5">Local / KMS / Vault</text>
+
+<line x1="182" y1="510" x2="200" y2="510" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="334" y1="510" x2="352" y2="510" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="486" y1="510" x2="504" y2="510" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<line x1="420" y1="532" x2="420" y2="588" stroke="#185FA5" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text font-size="11" x="428" y="564" fill="#888780">5. signed raw tx</text>
+
+<!-- BLOCKCHAIN LAYER -->
+<rect x="30" y="588" width="620" height="80" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="603" fill="#888780">blockchain layer</text>
+
+<rect x="50" y="604" width="148" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="124" y="622" text-anchor="middle" fill="#27500A">RPC provider</text>
+<text font-size="12" x="124" y="639" text-anchor="middle" fill="#3B6D11">Alchemy / Infura</text>
+<text font-size="12" x="124" y="654" text-anchor="middle" fill="#3B6D11">ETH / Polygon / Base</text>
+
+<rect x="228" y="604" width="168" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="312" y="622" text-anchor="middle" fill="#27500A">MinimalForwarder</text>
+<text font-size="12" x="312" y="639" text-anchor="middle" fill="#3B6D11">Verifies EIP-712 sig</text>
+<text font-size="12" x="312" y="654" text-anchor="middle" fill="#3B6D11">Increments nonce · appends sender</text>
+
+<rect x="426" y="604" width="200" height="56" rx="8" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="526" y="622" text-anchor="middle" fill="#27500A">Your contract (ERC-2771)</text>
+<text font-size="12" x="526" y="639" text-anchor="middle" fill="#3B6D11">_msgSender() = real user</text>
+<text font-size="12" x="526" y="654" text-anchor="middle" fill="#3B6D11">not the relayer wallet</text>
+
+<line x1="198" y1="632" x2="226" y2="632" stroke="#3B6D11" stroke-width="1.5" marker-end="url(#arrow)"/>
+<line x1="396" y1="632" x2="424" y2="632" stroke="#3B6D11" stroke-width="1.5" marker-end="url(#arrow)"/>
+
+<!-- PERSISTENCE LAYER -->
+<rect x="30" y="700" width="620" height="80" rx="10" fill="none" stroke="#d1cfca" stroke-width="0.5" stroke-dasharray="4 3"/>
+<text font-size="11" x="46" y="715" fill="#888780">persistence &amp; secrets layer</text>
+
+<rect x="50" y="716" width="168" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="134" y="737" text-anchor="middle" fill="#444441">PostgreSQL</text>
+<text font-size="12" x="134" y="754" text-anchor="middle" fill="#5F5E5A">Jobs · policies · teams</text>
+<text font-size="12" x="134" y="769" text-anchor="middle" fill="#5F5E5A">gas usage · banned users</text>
+
+<rect x="240" y="716" width="148" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="314" y="737" text-anchor="middle" fill="#444441">Redis</text>
+<text font-size="12" x="314" y="754" text-anchor="middle" fill="#5F5E5A">Rate limiting</text>
+<text font-size="12" x="314" y="769" text-anchor="middle" fill="#5F5E5A">Queue overflow · cache</text>
+
+<rect x="410" y="716" width="120" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="470" y="737" text-anchor="middle" fill="#444441">AWS KMS</text>
+<text font-size="12" x="470" y="754" text-anchor="middle" fill="#5F5E5A">Remote signing</text>
+<text font-size="12" x="470" y="769" text-anchor="middle" fill="#5F5E5A">Key never in memory</text>
+
+<rect x="548" y="716" width="100" height="56" rx="8" fill="#F1EFE8" stroke="#5F5E5A" stroke-width="0.5"/>
+<text font-weight="500" font-size="14" x="598" y="737" text-anchor="middle" fill="#444441">Vault</text>
+<text font-size="12" x="598" y="754" text-anchor="middle" fill="#5F5E5A">Transit engine</text>
+<text font-size="12" x="598" y="769" text-anchor="middle" fill="#5F5E5A">Self-hosted HSM</text>
+
+<!-- side connectors -->
+<line x1="116" y1="532" x2="116" y2="716" stroke="#b4b2a9" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+<text font-size="11" x="68" y="624" text-anchor="middle" fill="#888780">job state</text>
+<line x1="571" y1="532" x2="571" y2="716" stroke="#b4b2a9" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+
+<!-- LEGEND -->
+<rect x="30" y="816" width="620" height="80" rx="8" fill="none" stroke="#d1cfca" stroke-width="0.5"/>
+<text font-size="11" x="46" y="833" fill="#888780">legend</text>
+
+<rect x="50" y="844" width="12" height="12" rx="2" fill="#E1F5EE" stroke="#0F6E56" stroke-width="0.5"/>
+<text font-size="12" x="68" y="854" fill="#444441">Client</text>
+<rect x="134" y="844" width="12" height="12" rx="2" fill="#EEEDFE" stroke="#534AB7" stroke-width="0.5"/>
+<text font-size="12" x="152" y="854" fill="#444441">API / middleware</text>
+<rect x="270" y="844" width="12" height="12" rx="2" fill="#FAECE7" stroke="#993C1D" stroke-width="0.5"/>
+<text font-size="12" x="288" y="854" fill="#444441">Validation</text>
+<rect x="370" y="844" width="12" height="12" rx="2" fill="#FAEEDA" stroke="#BA7517" stroke-width="0.5"/>
+<text font-size="12" x="388" y="854" fill="#444441">Queue</text>
+<rect x="440" y="844" width="12" height="12" rx="2" fill="#E6F1FB" stroke="#185FA5" stroke-width="0.5"/>
+<text font-size="12" x="458" y="854" fill="#444441">Executor</text>
+<rect x="528" y="844" width="12" height="12" rx="2" fill="#EAF3DE" stroke="#3B6D11" stroke-width="0.5"/>
+<text font-size="12" x="546" y="854" fill="#444441">Blockchain</text>
+
+<line x1="50" y1="878" x2="90" y2="878" stroke="#5F5E5A" stroke-width="1.5" marker-end="url(#arrow)"/>
+<text font-size="12" x="98" y="882" fill="#444441">request flow</text>
+<line x1="210" y1="878" x2="250" y2="878" stroke="#b4b2a9" stroke-width="1" stroke-dasharray="3 3" marker-end="url(#arrow)"/>
+<text font-size="12" x="258" y="882" fill="#444441">async / side-channel</text>
+</svg>
