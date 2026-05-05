@@ -4,6 +4,10 @@ use serde::{Deserialize, Serialize};
 use uuid::Uuid;
 use validator::Validate;
 
+/// Signing data for OZ ERC2771Forwarder.
+/// Typehash: "ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)"
+/// Note: nonce is in the signing hash but NOT in the on-chain ForwardRequestData struct —
+/// the forwarder reads nonces(from) itself and verifies it matches.
 #[derive(Debug, Clone, Serialize, Deserialize, Validate)]
 #[serde(rename_all = "camelCase")]
 pub struct ForwardRequest {
@@ -11,10 +15,10 @@ pub struct ForwardRequest {
     pub to: Address,
     pub value: U256,
     pub gas: U256,
+    /// Current value of forwarder.nonces(from) at signing time.
     pub nonce: U256,
-    // Not in base ERC-2771 spec — strongly recommended for production
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub deadline: Option<U256>,
+    /// Unix timestamp (seconds). Must fit in uint48 (~year 8921).
+    pub deadline: u64,
     pub data: Bytes,
 }
 
@@ -96,12 +100,4 @@ pub struct GasPrice {
     pub max_fee_per_gas: U256,
     pub max_priority_fee_per_gas: U256,
     pub base_fee: U256,
-}
-
-#[derive(Debug, Clone)]
-pub struct NonceInfo {
-    pub address: Address,
-    pub chain_id: u64,
-    pub nonce: U256,
-    pub fetched_at: DateTime<Utc>,
 }

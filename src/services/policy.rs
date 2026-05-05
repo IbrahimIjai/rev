@@ -258,7 +258,7 @@ mod tests {
             value: U256::ZERO,
             gas,
             nonce: U256::ZERO,
-            deadline: None,
+            deadline: 9999999999u64,
             data: Bytes::from(vec![0xa9, 0x05, 0x9c, 0xbb, 0x00, 0x00, 0x00, 0x00]), // transfer(...)
         }
     }

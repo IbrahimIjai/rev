@@ -9,6 +9,10 @@ description = "Production-grade ERC-2771 meta-transaction gas relayer"
 name = "gas-relayer"
 path = "src/main.rs"
 
+[[bin]]
+name = "gas-relayer-migrate"
+path = "src/bin/migrate.rs"
+
 [dependencies]
 # Async runtime
 tokio = { version = "1.36", features = ["full"] }
@@ -26,16 +30,36 @@ hex-literal = "0.4"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
 
-# Database
-sqlx = { version = "0.7", features = ["runtime-tokio-rustls", "postgres", "uuid", "chrono", "json"] }
+# Database — SeaORM with Postgres (Neon compatible)
+sea-orm = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+    "macros",
+    "with-uuid",
+    "with-chrono",
+    "with-rust_decimal",
+    "with-json",
+] }
+sea-orm-migration = { version = "1.1", features = [
+    "sqlx-postgres",
+    "runtime-tokio-rustls",
+] }
+rust_decimal = { version = "1.35", features = ["serde-with-str"] }
 
-# Redis (queue + rate limiting)
-redis = { version = "0.25", features = ["tokio-comp", "connection-manager"] }
+# Crypto
+k256 = { version = "0.13", features = ["ecdsa"] }
+sha3 = "0.10"
+sha2 = "0.10"
+hex = "0.4"
+aes-gcm = { version = "0.10", features = ["std"] }
+rand = "0.8"
+
+# Auth
+jsonwebtoken = "9"
 
 # Tracing / logging
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter", "json"] }
-tracing-opentelemetry = "0.22"
 
 # Error handling
 thiserror = "1.0"
@@ -47,11 +71,6 @@ dotenvy = "0.15"
 
 # Validation
 validator = { version = "0.18", features = ["derive"] }
-
-# Crypto
-k256 = { version = "0.13", features = ["ecdsa"] }
-sha3 = "0.10"
-hex = "0.4"
 
 # HTTP client (for RPC)
 reqwest = { version = "0.11", features = ["json", "rustls-tls"], default-features = false }
@@ -72,8 +91,6 @@ axum-prometheus = "0.6"
 
 [dev-dependencies]
 tokio-test = "0.4"
-mockall = "0.12"
-axum-test = "16.0.0"
 
 [profile.release]
 opt-level = 3

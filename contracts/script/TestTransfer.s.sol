@@ -1,100 +1,87 @@
 // SPDX-License-Identifier: MIT
-pragma solidity ^0.8.19;
+pragma solidity ^0.8.20;
 
 import {Script, console2} from "forge-std/Script.sol";
-import {MinimalForwarder} from "../src/MinimalForwarder.sol";
-import {ExampleGaslessToken} from "../src/ExampleGaslessToken.sol";
+import {ERC2771Forwarder} from "@openzeppelin/contracts/metatx/ERC2771Forwarder.sol";
+import {GaslessToken} from "../src/GaslessToken.sol";
 
+/**
+ * @notice End-to-end gasless transfer script using OZ ERC2771Forwarder.
+ *
+ * Usage:
+ *   export FORWARDER_ADDRESS=0x...  TOKEN_ADDRESS=0x...
+ *   export USER_PRIVATE_KEY=0x...   RELAYER_PRIVATE_KEY=0x...
+ *   forge script script/TestTransfer.s.sol --rpc-url $RPC_URL --broadcast
+ */
 contract TestTransferScript is Script {
-    // ARC testnet chain ID
-    uint256 constant CHAIN_ID = 5042002;
+    bytes32 constant DOMAIN_TYPEHASH = keccak256(
+        "EIP712Domain(string name,string version,uint256 chainId,address verifyingContract)"
+    );
+    // OZ v5.6.1: nonce is in the typehash, deadline is uint48
+    bytes32 constant FORWARD_TYPEHASH = keccak256(
+        "ForwardRequest(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint48 deadline,bytes data)"
+    );
 
     function run() public {
         address forwarderAddr = vm.envAddress("FORWARDER_ADDRESS");
-        address tokenAddr = vm.envAddress("TOKEN_ADDRESS");
+        address tokenAddr    = vm.envAddress("TOKEN_ADDRESS");
+        uint256 userPk       = vm.envUint("USER_PRIVATE_KEY");
+        uint256 relayerPk    = vm.envUint("RELAYER_PRIVATE_KEY");
+        address user         = vm.addr(userPk);
+        address recipient    = vm.envOr("RECIPIENT_ADDRESS", address(0xdead));
+        uint256 amount       = 100 ether;
 
-        // User wallet — signs the meta-tx but holds no gas
-        uint256 userPrivateKey = vm.envUint("USER_PRIVATE_KEY");
-        address user = vm.addr(userPrivateKey);
+        ERC2771Forwarder forwarder = ERC2771Forwarder(forwarderAddr);
+        GaslessToken token = GaslessToken(tokenAddr);
 
-        // Recipient for the gasless transfer
-        address recipient = vm.envOr("RECIPIENT_ADDRESS", address(0xdead));
-
-        uint256 transferAmount = 100 ether;
-
-        MinimalForwarder forwarder = MinimalForwarder(forwarderAddr);
-        ExampleGaslessToken token = ExampleGaslessToken(tokenAddr);
-
-        // Relayer mints tokens to the user first
-        uint256 relayerKey = vm.envUint("RELAYER_PRIVATE_KEY");
-        vm.startBroadcast(relayerKey);
-        token.mint(user, transferAmount * 10);
-        console2.log("Minted", transferAmount * 10, "tokens to user:", user);
+        // Relayer mints tokens to user
+        vm.startBroadcast(relayerPk);
+        token.mint(user, amount * 10);
         vm.stopBroadcast();
+        console2.log("Minted to user:", user);
 
-        // Build the EIP-712 ForwardRequest for a gasless transfer
-        uint256 nonce = forwarder.getNonce(user);
-        uint256 deadline = block.timestamp + 1 hours;
-
-        // Encode transfer(recipient, amount)
-        bytes memory transferData = abi.encodeWithSignature(
-            "transfer(address,uint256)",
-            recipient,
-            transferAmount
-        );
-
-        MinimalForwarder.ForwardRequestWithDeadline memory req = MinimalForwarder.ForwardRequestWithDeadline({
-            from: user,
-            to: tokenAddr,
-            value: 0,
-            gas: 200_000,
-            nonce: nonce,
-            deadline: deadline,
-            data: transferData
+        // Build request
+        ERC2771Forwarder.ForwardRequestData memory req = ERC2771Forwarder.ForwardRequestData({
+            from:      user,
+            to:        tokenAddr,
+            value:     0,
+            gas:       200_000,
+            deadline:  uint48(block.timestamp + 1 hours),
+            data:      abi.encodeCall(token.transfer, (recipient, amount)),
+            signature: new bytes(0)
         });
 
-        // Sign the request as the user (no ETH needed)
-        bytes32 domainSep = forwarder.domainSeparator();
-        bytes32 typeHash = keccak256(
-            "ForwardRequestWithDeadline(address from,address to,uint256 value,uint256 gas,uint256 nonce,uint256 deadline,bytes data)"
-        );
-        bytes32 structHash = keccak256(
-            abi.encode(
-                typeHash,
-                req.from,
-                req.to,
-                req.value,
-                req.gas,
-                req.nonce,
-                req.deadline,
-                keccak256(req.data)
-            )
-        );
+        // Compute domain separator (OZ v5 has no public DOMAIN_SEPARATOR())
+        bytes32 domainSep = keccak256(abi.encode(
+            DOMAIN_TYPEHASH,
+            keccak256(bytes("GasRelayForwarder")),
+            keccak256(bytes("1")),
+            block.chainid,
+            forwarderAddr
+        ));
+
+        // EIP-712 sign
+        uint256 nonce = forwarder.nonces(user);
+        bytes32 structHash = keccak256(abi.encode(
+            FORWARD_TYPEHASH,
+            req.from, req.to, req.value, req.gas,
+            nonce, req.deadline, keccak256(req.data)
+        ));
         bytes32 digest = keccak256(abi.encodePacked("\x19\x01", domainSep, structHash));
-        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPrivateKey, digest);
-        bytes memory signature = abi.encodePacked(r, s, v);
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(userPk, digest);
+        req.signature = abi.encodePacked(r, s, v);
 
-        // Balances before
-        uint256 userBalBefore = token.balanceOf(user);
-        uint256 recipientBalBefore = token.balanceOf(recipient);
-        console2.log("User balance before:      ", userBalBefore);
-        console2.log("Recipient balance before: ", recipientBalBefore);
+        uint256 before = token.balanceOf(recipient);
+        console2.log("Recipient balance before:", before);
 
-        // Relayer submits the meta-tx on behalf of the user
-        vm.startBroadcast(relayerKey);
-        (bool success,) = forwarder.execute(req, signature);
-        require(success, "TestTransfer: meta-tx reverted");
+        // Relayer submits — user pays no gas
+        vm.startBroadcast(relayerPk);
+        forwarder.execute(req);
         vm.stopBroadcast();
 
-        // Balances after
-        uint256 userBalAfter = token.balanceOf(user);
-        uint256 recipientBalAfter = token.balanceOf(recipient);
-        console2.log("User balance after:       ", userBalAfter);
-        console2.log("Recipient balance after:  ", recipientBalAfter);
-
-        require(userBalAfter == userBalBefore - transferAmount, "user balance mismatch");
-        require(recipientBalAfter == recipientBalBefore + transferAmount, "recipient balance mismatch");
-
-        console2.log("Gasless transfer SUCCESS");
+        uint256 after_ = token.balanceOf(recipient);
+        console2.log("Recipient balance after: ", after_);
+        require(after_ == before + amount, "transfer amount mismatch");
+        console2.log("SUCCESS: gasless transfer via OZ ERC2771Forwarder");
     }
 }

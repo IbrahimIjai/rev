@@ -1,4 +1,4 @@
-use crate::models::{ForwardRequest};
+use crate::models::ForwardRequest;
 use crate::services::{
     nonce_manager::NonceService,
     policy::PolicyEnforcer,
@@ -22,6 +22,7 @@ const BASE_RETRY_DELAY_SECS: u64 = 5;
 #[derive(Debug, Clone)]
 pub struct QueuedJob {
     pub id: Uuid,
+    pub project_id: Uuid,
     pub chain_id: u64,
     pub request: ForwardRequest,
     pub signature: Bytes,
@@ -48,7 +49,7 @@ impl RelayQueue {
 }
 
 #[derive(Debug, Clone)]
-pub struct ProcessorContext<P, T = alloy::transports::BoxTransport> 
+pub struct ProcessorContext<P, T = alloy::transports::BoxTransport>
 where
     P: Provider<T, Ethereum>,
     T: Transport + Clone,
@@ -58,7 +59,7 @@ where
     pub policy_enforcer: Arc<PolicyEnforcer>,
 }
 
-pub async fn process_job<P, T>(ctx: &ProcessorContext<P, T>, job: &QueuedJob) -> ProcessResult 
+pub async fn process_job<P, T>(ctx: &ProcessorContext<P, T>, job: &QueuedJob) -> ProcessResult
 where
     P: Provider<T, Ethereum>,
     T: Transport + Clone,
@@ -66,14 +67,16 @@ where
     let req = &job.request;
     let sig = &job.signature;
 
-    match ctx.nonce_service.validate_user_nonce(req.from, req.nonce).await {
-        Ok(()) => {}
-        Err(e) => return ProcessResult::PermanentFailure(format!("nonce invalid: {}", e)),
-    }
-
-    let relayer_nonce = match ctx.nonce_service.relayer_manager.acquire_nonce(&*ctx.nonce_service.provider).await {
+    let relayer_nonce = match ctx
+        .nonce_service
+        .relayer_manager
+        .acquire_nonce(&*ctx.nonce_service.provider)
+        .await
+    {
         Ok(n) => n,
-        Err(e) => return ProcessResult::RetryableFailure(format!("failed to acquire nonce: {}", e)),
+        Err(e) => {
+            return ProcessResult::RetryableFailure(format!("failed to acquire nonce: {}", e))
+        }
     };
 
     let tx_hash = match ctx.executor.submit(req, sig, relayer_nonce).await {
@@ -83,7 +86,11 @@ where
         }
         Err(e) => {
             warn!(error = %e, "transaction submission failed");
-            let _ = ctx.nonce_service.relayer_manager.reset_from_chain(&*ctx.nonce_service.provider).await;
+            let _ = ctx
+                .nonce_service
+                .relayer_manager
+                .reset_from_chain(&*ctx.nonce_service.provider)
+                .await;
             return ProcessResult::RetryableFailure(format!("submission failed: {}", e));
         }
     };
@@ -92,8 +99,14 @@ where
         Ok(receipt) => {
             ctx.nonce_service.invalidate_user_nonce(req.from);
             let actual_gas = U256::from(receipt.gas_used);
-            ctx.policy_enforcer.record_actual_gas_used(req.from, req.gas, actual_gas).await;
-            ProcessResult::Success { tx_hash, block_number: receipt.block_number, gas_used: Some(actual_gas) }
+            ctx.policy_enforcer
+                .record_actual_gas_used(req.from, req.gas, actual_gas)
+                .await;
+            ProcessResult::Success {
+                tx_hash,
+                block_number: receipt.block_number,
+                gas_used: Some(actual_gas),
+            }
         }
         Err(e) => {
             if e.to_string().contains("reverted") {
@@ -127,18 +140,34 @@ pub async fn run_worker<P, T>(
     T: Transport + Clone + 'static,
 {
     while let Some(job) = receiver.recv().await {
+        info!(worker = worker_id, job_id = %job.id, "processing job");
         match process_job(&ctx, &job).await {
-            ProcessResult::Success { .. } => info!("job completed successfully"),
+            ProcessResult::Success { tx_hash, .. } => {
+                info!(job_id = %job.id, tx_hash = ?tx_hash, "job confirmed");
+            }
             ProcessResult::RetryableFailure(reason) => {
                 let attempts = job.attempts + 1;
                 if attempts < MAX_RETRIES {
                     let delay = BASE_RETRY_DELAY_SECS * (2u64.pow(attempts));
-                    let retry_job = QueuedJob { attempts, next_attempt_at: Utc::now() + chrono::Duration::seconds(delay as i64), ..job };
-                    let retry_sender = retry_sender.clone();
-                    tokio::spawn(async move { sleep(Duration::from_secs(delay)).await; let _ = retry_sender.send(retry_job).await; });
+                    warn!(job_id = %job.id, attempt = attempts, delay, "retrying job");
+                    let retry_job = QueuedJob {
+                        attempts,
+                        next_attempt_at: Utc::now()
+                            + chrono::Duration::seconds(delay as i64),
+                        ..job
+                    };
+                    let rs = retry_sender.clone();
+                    tokio::spawn(async move {
+                        sleep(Duration::from_secs(delay)).await;
+                        let _ = rs.send(retry_job).await;
+                    });
+                } else {
+                    error!(job_id = %job.id, "max retries reached: {}", reason);
                 }
             }
-            ProcessResult::PermanentFailure(reason) => error!(reason = %reason, "job permanently failed"),
+            ProcessResult::PermanentFailure(reason) => {
+                error!(job_id = %job.id, "job permanently failed: {}", reason);
+            }
         }
     }
 }
@@ -152,8 +181,8 @@ pub async fn spawn_worker_pool<P, T>(
     T: Transport + Clone + 'static,
 {
     let (retry_sender, retry_receiver) = mpsc::channel(1000);
-    let ctx_clone = ctx.clone();
-    let rs_clone = retry_sender.clone();
-    tokio::spawn(async move { run_worker(receiver, rs_clone, ctx_clone, 0).await; });
-    tokio::spawn(async move { run_worker(retry_receiver, retry_sender, ctx, 1).await; });
+    let ctx_a = ctx.clone();
+    let rs_a = retry_sender.clone();
+    tokio::spawn(async move { run_worker(receiver, rs_a, ctx_a, 0).await });
+    tokio::spawn(async move { run_worker(retry_receiver, retry_sender, ctx, 1).await });
 }

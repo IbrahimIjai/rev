@@ -12,10 +12,11 @@ use std::sync::Arc;
 use tokio::sync::Mutex;
 use tracing::{debug, warn};
 
+/// OZ ERC2771Forwarder uses `nonces(address)` (ERC-2612 style), not `getNonce`.
 sol! {
     #[sol(rpc)]
-    interface IForwarder {
-        function getNonce(address from) external view returns (uint256);
+    interface IERC2771Forwarder {
+        function nonces(address owner) external view returns (uint256);
     }
 }
 
@@ -35,17 +36,22 @@ impl UserNonceCache {
     pub fn new(ttl_seconds: u64) -> Self {
         Self { cache: DashMap::new(), ttl_seconds }
     }
+
     pub fn get(&self, chain_id: u64, user: Address) -> Option<U256> {
         let key = (chain_id, user);
         if let Some(entry) = self.cache.get(&key) {
             let age = Utc::now().signed_duration_since(entry.fetched_at).num_seconds() as u64;
-            if age < self.ttl_seconds { return Some(entry.nonce); }
+            if age < self.ttl_seconds {
+                return Some(entry.nonce);
+            }
         }
         None
     }
+
     pub fn set(&self, chain_id: u64, user: Address, nonce: U256) {
         self.cache.insert((chain_id, user), CachedNonce { nonce, fetched_at: Utc::now() });
     }
+
     pub fn invalidate(&self, chain_id: u64, user: Address) {
         self.cache.remove(&(chain_id, user));
     }
@@ -70,11 +76,15 @@ impl RelayerNonceManager {
         Self {
             address,
             chain_id,
-            inner: Mutex::new(RelayerNonceState { next_nonce: 0, initialized: false, pending: Vec::new() }),
+            inner: Mutex::new(RelayerNonceState {
+                next_nonce: 0,
+                initialized: false,
+                pending: Vec::new(),
+            }),
         }
     }
 
-    pub async fn acquire_nonce<P, T>(&self, provider: &P) -> Result<u64> 
+    pub async fn acquire_nonce<P, T>(&self, provider: &P) -> Result<u64>
     where
         P: Provider<T, Ethereum>,
         T: Transport + Clone,
@@ -92,11 +102,10 @@ impl RelayerNonceManager {
     }
 
     pub async fn confirm_nonce(&self, nonce: u64) {
-        let mut state = self.inner.lock().await;
-        state.pending.retain(|&n| n != nonce);
+        self.inner.lock().await.pending.retain(|&n| n != nonce);
     }
 
-    pub async fn reset_from_chain<P, T>(&self, provider: &P) -> Result<()> 
+    pub async fn reset_from_chain<P, T>(&self, provider: &P) -> Result<()>
     where
         P: Provider<T, Ethereum>,
         T: Transport + Clone,
@@ -125,12 +134,17 @@ impl<P, T> std::fmt::Debug for NonceService<P, T> {
     }
 }
 
-impl<P, T> NonceService<P, T> 
+impl<P, T> NonceService<P, T>
 where
     P: Provider<T, Ethereum>,
     T: Transport + Clone,
 {
-    pub fn new(provider: Arc<P>, forwarder_address: Address, relayer_address: Address, chain_id: u64) -> Self {
+    pub fn new(
+        provider: Arc<P>,
+        forwarder_address: Address,
+        relayer_address: Address,
+        chain_id: u64,
+    ) -> Self {
         Self {
             user_cache: Arc::new(UserNonceCache::new(30)),
             relayer_manager: Arc::new(RelayerNonceManager::new(relayer_address, chain_id)),
@@ -141,19 +155,17 @@ where
         }
     }
 
+    /// Fetch user's current nonce from the OZ ERC2771Forwarder.
+    /// Used by the GET /nonce endpoint; validation is done on-chain by the forwarder.
     pub async fn get_user_nonce(&self, user: Address) -> Result<U256> {
-        if let Some(cached) = self.user_cache.get(self.chain_id, user) { return Ok(cached); }
-        let forwarder = IForwarder::new(self.forwarder_address, &*self.provider);
-        let IForwarder::getNonceReturn { _0: nonce } = forwarder.getNonce(user).call().await?;
+        if let Some(cached) = self.user_cache.get(self.chain_id, user) {
+            return Ok(cached);
+        }
+        let forwarder = IERC2771Forwarder::new(self.forwarder_address, &*self.provider);
+        let IERC2771Forwarder::noncesReturn { _0: nonce } =
+            forwarder.nonces(user).call().await?;
         self.user_cache.set(self.chain_id, user, nonce);
         Ok(nonce)
-    }
-
-    pub async fn validate_user_nonce(&self, user: Address, claimed_nonce: U256) -> Result<()> {
-        let forwarder = IForwarder::new(self.forwarder_address, &*self.provider);
-        let IForwarder::getNonceReturn { _0: on_chain } = forwarder.getNonce(user).call().await?;
-        anyhow::ensure!(claimed_nonce == on_chain, "nonce mismatch");
-        Ok(())
     }
 
     pub fn invalidate_user_nonce(&self, user: Address) {
