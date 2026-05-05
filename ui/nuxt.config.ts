@@ -5,6 +5,7 @@ export default defineNuxtConfig({
     '@nuxt/eslint',
     '@nuxt/ui',
     '@pinia/nuxt',
+    '@wagmi/vue/nuxt',
   ],
 
   devtools: { enabled: true },
@@ -40,8 +41,7 @@ export default defineNuxtConfig({
       global: 'globalThis',
     },
     optimizeDeps: {
-      include: ['@web3auth/modal', '@web3auth/base', '@web3auth/no-modal'],
-      exclude: ['@web3auth/modal/vue'],
+      include: ['@reown/appkit', '@reown/appkit-adapter-wagmi'],
     },
   },
 })

@@ -89,19 +89,19 @@ async function copyText(text: string) {
   <div class="space-y-8">
     <!-- Back link + header -->
     <div>
-      <NuxtLink to="/projects" class="inline-flex items-center gap-1 text-xs text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 mb-4 transition-colors">
+      <NuxtLink to="/projects" class="inline-flex items-center gap-1 text-xs text-dimmed hover:text-muted mb-4 transition-colors">
         <UIcon name="i-heroicons-arrow-left" class="w-3.5 h-3.5" />
         All Projects
       </NuxtLink>
 
-      <div v-if="pending" class="h-8 w-48 bg-gray-100 dark:bg-gray-900 rounded-lg animate-pulse" />
+      <div v-if="pending" class="h-8 w-48 bg-elevated rounded-lg animate-pulse" />
       <div v-else-if="project" class="flex items-center justify-between">
         <div class="flex items-center gap-3">
-          <h2 class="text-xl font-bold text-gray-900 dark:text-white">{{ project.name }}</h2>
+          <h2 class="text-xl font-bold text-highlighted">{{ project.name }}</h2>
           <UBadge :color="project.active ? 'success' : 'neutral'" variant="subtle" size="sm">
             {{ project.active ? 'Active' : 'Paused' }}
           </UBadge>
-          <span class="text-xs text-gray-400 bg-gray-100 dark:bg-gray-900 px-2 py-0.5 rounded-md">
+          <span class="text-xs text-dimmed bg-elevated px-2 py-0.5 rounded-md">
             {{ CONFIG.networkName(project.chainId) }}
           </span>
         </div>
@@ -112,73 +112,73 @@ async function copyText(text: string) {
       <!-- Left column: integration info -->
       <div class="lg:col-span-2 space-y-6">
         <!-- API Integration card -->
-        <div class="rounded-2xl border border-gray-100 dark:border-gray-900 overflow-hidden">
-          <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-900 flex items-center justify-between">
+        <div class="rounded-2xl border border-default overflow-hidden">
+          <div class="px-5 py-4 bg-muted border-b border-default flex items-center justify-between">
             <div class="flex items-center gap-2">
-              <UIcon name="i-heroicons-key" class="w-4 h-4 text-gray-500" />
-              <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Integration</span>
+              <UIcon name="i-heroicons-key" class="w-4 h-4 text-muted" />
+              <span class="text-sm font-semibold text-toned">Integration</span>
             </div>
             <UButton icon="i-heroicons-plus" label="New API Key" color="neutral" variant="ghost" size="xs" @click="showNewKey = true" />
           </div>
 
-          <div class="p-5 space-y-4 bg-white dark:bg-gray-950">
+          <div class="p-5 space-y-4 bg-default">
             <div class="space-y-1.5">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Forwarder Address</p>
+              <p class="text-xs font-semibold text-dimmed uppercase tracking-wide">Forwarder Address</p>
               <div class="flex items-center gap-2">
-                <code class="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 truncate">{{ project.forwarderAddress }}</code>
+                <code class="flex-1 text-xs font-mono bg-muted border border-default rounded-lg px-3 py-2 text-toned truncate">{{ project.forwarderAddress }}</code>
                 <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText(project.forwarderAddress)" />
               </div>
             </div>
 
             <div class="space-y-1.5">
-              <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Relay Endpoint</p>
+              <p class="text-xs font-semibold text-dimmed uppercase tracking-wide">Relay Endpoint</p>
               <div class="flex items-center gap-2">
-                <code class="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-orange-600 dark:text-orange-400 truncate">POST /relay</code>
+                <code class="flex-1 text-xs font-mono bg-muted border border-default rounded-lg px-3 py-2 text-primary truncate">POST /relay</code>
                 <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText('POST /relay')" />
               </div>
-              <p class="text-xs text-gray-400">Include your API key as <code class="text-orange-500">Authorization: Bearer &lt;key&gt;</code> or <code class="text-orange-500">X-API-Key</code>.</p>
+              <p class="text-xs text-dimmed">Include your API key as <code class="text-primary">Authorization: Bearer &lt;key&gt;</code> or <code class="text-primary">X-API-Key</code>.</p>
             </div>
           </div>
         </div>
 
         <!-- Spending limits card -->
-        <div class="rounded-2xl border border-gray-100 dark:border-gray-900 overflow-hidden">
-          <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-900 flex items-center gap-2">
-            <UIcon name="i-heroicons-shield-check" class="w-4 h-4 text-gray-500" />
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Spending Limits</span>
+        <div class="rounded-2xl border border-default overflow-hidden">
+          <div class="px-5 py-4 bg-muted border-b border-default flex items-center gap-2">
+            <UIcon name="i-heroicons-shield-check" class="w-4 h-4 text-muted" />
+            <span class="text-sm font-semibold text-toned">Spending Limits</span>
           </div>
 
-          <div class="p-5 space-y-5 bg-white dark:bg-gray-950">
+          <div class="p-5 space-y-5 bg-default">
             <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Max Gas Per Request</label>
+                <label class="text-xs font-semibold text-dimmed uppercase tracking-wide">Max Gas Per Request</label>
                 <UInput v-model="limitsForm.maxGasPerRequest" placeholder="500000" size="sm" />
-                <p class="text-xs text-gray-400">Gas units cap per relay call</p>
+                <p class="text-xs text-dimmed">Gas units cap per relay call</p>
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Max Gas Price (Gwei)</label>
+                <label class="text-xs font-semibold text-dimmed uppercase tracking-wide">Max Gas Price (Gwei)</label>
                 <UInput v-model="limitsForm.maxGasPriceGwei" type="number" placeholder="150" size="sm" />
-                <p class="text-xs text-gray-400">Reject if gas price exceeds this</p>
+                <p class="text-xs text-dimmed">Reject if gas price exceeds this</p>
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Daily Gas Quota / User</label>
+                <label class="text-xs font-semibold text-dimmed uppercase tracking-wide">Daily Gas Quota / User</label>
                 <UInput v-model="limitsForm.dailyGasQuotaPerUser" placeholder="5000000" size="sm" />
-                <p class="text-xs text-gray-400">Gas units per user per day (empty = unlimited)</p>
+                <p class="text-xs text-dimmed">Gas units per user per day (empty = unlimited)</p>
               </div>
 
               <div class="space-y-1.5">
-                <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Rate Limit (req/min)</label>
+                <label class="text-xs font-semibold text-dimmed uppercase tracking-wide">Rate Limit (req/min)</label>
                 <UInput v-model="limitsForm.rateLimitPerMinute" type="number" placeholder="10" size="sm" />
-                <p class="text-xs text-gray-400">Per-user rate limit per minute</p>
+                <p class="text-xs text-dimmed">Per-user rate limit per minute</p>
               </div>
             </div>
 
             <div class="space-y-1.5">
-              <label class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Webhook URL (optional)</label>
+              <label class="text-xs font-semibold text-dimmed uppercase tracking-wide">Webhook URL (optional)</label>
               <UInput v-model="limitsForm.webhookUrl" placeholder="https://your-app.com/webhook" size="sm" />
-              <p class="text-xs text-gray-400">Notified on relay success / failure</p>
+              <p class="text-xs text-dimmed">Notified on relay success / failure</p>
             </div>
 
             <div class="flex justify-end">
@@ -198,51 +198,51 @@ async function copyText(text: string) {
       <!-- Right column: addresses -->
       <div class="space-y-4">
         <!-- Gas Tank -->
-        <div class="rounded-2xl border border-gray-100 dark:border-gray-900 overflow-hidden">
-          <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-900 flex items-center gap-2">
-            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 text-gray-500" />
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Gas Tank</span>
+        <div class="rounded-2xl border border-default overflow-hidden">
+          <div class="px-5 py-4 bg-muted border-b border-default flex items-center gap-2">
+            <UIcon name="i-heroicons-circle-stack" class="w-4 h-4 text-muted" />
+            <span class="text-sm font-semibold text-toned">Gas Tank</span>
           </div>
-          <div class="p-5 bg-white dark:bg-gray-950 space-y-3">
-            <p class="text-xs text-gray-400">Fund this address with ETH. The relayer draws from it to pay gas on behalf of your users.</p>
+          <div class="p-5 bg-default space-y-3">
+            <p class="text-xs text-dimmed">Fund this address with ETH. The relayer draws from it to pay gas on behalf of your users.</p>
             <div v-if="project.gasTankAddress" class="flex items-center gap-2">
-              <code class="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 truncate">{{ project.gasTankAddress }}</code>
+              <code class="flex-1 text-xs font-mono bg-muted border border-default rounded-lg px-3 py-2 text-toned truncate">{{ project.gasTankAddress }}</code>
               <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText(project.gasTankAddress!)" />
             </div>
-            <div v-else class="text-xs text-gray-400 italic">Not provisioned</div>
+            <div v-else class="text-xs text-dimmed italic">Not provisioned</div>
           </div>
         </div>
 
         <!-- Relayer Wallet -->
-        <div class="rounded-2xl border border-gray-100 dark:border-gray-900 overflow-hidden">
-          <div class="px-5 py-4 bg-gray-50 dark:bg-gray-900/50 border-b border-gray-100 dark:border-gray-900 flex items-center gap-2">
-            <UIcon name="i-heroicons-cpu-chip" class="w-4 h-4 text-gray-500" />
-            <span class="text-sm font-semibold text-gray-700 dark:text-gray-300">Relayer Wallet</span>
+        <div class="rounded-2xl border border-default overflow-hidden">
+          <div class="px-5 py-4 bg-muted border-b border-default flex items-center gap-2">
+            <UIcon name="i-heroicons-cpu-chip" class="w-4 h-4 text-muted" />
+            <span class="text-sm font-semibold text-toned">Relayer Wallet</span>
           </div>
-          <div class="p-5 bg-white dark:bg-gray-950 space-y-3">
-            <p class="text-xs text-gray-400">Hot wallet that submits transactions on-chain. Funded automatically from the gas tank.</p>
+          <div class="p-5 bg-default space-y-3">
+            <p class="text-xs text-dimmed">Hot wallet that submits transactions on-chain. Funded automatically from the gas tank.</p>
             <div v-if="project.relayerAddress" class="flex items-center gap-2">
-              <code class="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2 text-gray-600 dark:text-gray-400 truncate">{{ project.relayerAddress }}</code>
+              <code class="flex-1 text-xs font-mono bg-muted border border-default rounded-lg px-3 py-2 text-toned truncate">{{ project.relayerAddress }}</code>
               <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText(project.relayerAddress!)" />
             </div>
           </div>
         </div>
 
         <!-- Project meta -->
-        <div class="rounded-2xl border border-gray-100 dark:border-gray-900 p-5 bg-white dark:bg-gray-950 space-y-3">
-          <p class="text-xs font-semibold text-gray-400 uppercase tracking-wide">Project Info</p>
+        <div class="rounded-2xl border border-default p-5 bg-default space-y-3">
+          <p class="text-xs font-semibold text-dimmed uppercase tracking-wide">Project Info</p>
           <div class="space-y-2 text-xs">
             <div class="flex justify-between">
-              <span class="text-gray-400">Project ID</span>
-              <code class="text-gray-600 dark:text-gray-400 font-mono">{{ CONFIG.truncateAddress(project.id, 8, 6) }}</code>
+              <span class="text-dimmed">Project ID</span>
+              <code class="text-toned font-mono">{{ CONFIG.truncateAddress(project.id, 8, 6) }}</code>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Chain ID</span>
-              <span class="text-gray-700 dark:text-gray-300 font-medium">{{ project.chainId }}</span>
+              <span class="text-dimmed">Chain ID</span>
+              <span class="text-toned font-medium">{{ project.chainId }}</span>
             </div>
             <div class="flex justify-between">
-              <span class="text-gray-400">Created</span>
-              <span class="text-gray-700 dark:text-gray-300">{{ new Date(project.createdAt).toLocaleDateString() }}</span>
+              <span class="text-dimmed">Created</span>
+              <span class="text-toned">{{ new Date(project.createdAt).toLocaleDateString() }}</span>
             </div>
           </div>
         </div>
@@ -254,7 +254,7 @@ async function copyText(text: string) {
       <template #body>
         <div class="space-y-3 p-1">
           <div class="space-y-1.5">
-            <label class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Key Name</label>
+            <label class="text-xs font-semibold text-muted uppercase tracking-wide">Key Name</label>
             <UInput v-model="newKeyName" placeholder="e.g. Production, Staging" size="md" autofocus @keydown.enter="createKey" />
           </div>
         </div>
@@ -271,14 +271,14 @@ async function copyText(text: string) {
     <UModal v-model:open="showKeyResult" title="API Key Created" :dismissible="false">
       <template #body>
         <div class="space-y-4 p-1">
-          <div class="p-3 rounded-lg bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 flex gap-2">
-            <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4 text-amber-500 shrink-0 mt-0.5" />
-            <p class="text-xs text-amber-700 dark:text-amber-400">This key will <strong>not</strong> be shown again. Copy it now.</p>
+          <div class="p-3 rounded-lg bg-warning/10 border border-warning/20 flex gap-2">
+            <UIcon name="i-heroicons-exclamation-triangle" class="w-4 h-4 text-warning shrink-0 mt-0.5" />
+            <p class="text-xs text-warning">This key will <strong>not</strong> be shown again. Copy it now.</p>
           </div>
           <div v-if="newKeyResult" class="space-y-1.5">
-            <p class="text-xs font-semibold text-gray-500 uppercase tracking-wide">{{ newKeyResult.name }}</p>
+            <p class="text-xs font-semibold text-muted uppercase tracking-wide">{{ newKeyResult.name }}</p>
             <div class="flex items-center gap-2">
-              <code class="flex-1 text-xs font-mono bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-3 py-2.5 text-orange-600 dark:text-orange-400 break-all">{{ newKeyResult.apiKey }}</code>
+              <code class="flex-1 text-xs font-mono bg-muted border border-default rounded-lg px-3 py-2.5 text-primary break-all">{{ newKeyResult.apiKey }}</code>
               <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText(newKeyResult.apiKey)" />
             </div>
           </div>

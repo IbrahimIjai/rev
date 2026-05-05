@@ -16,7 +16,7 @@ export interface SpendingLimits {
   maxGasPerRequest: string
   maxGasPriceGwei: number
   rateLimitPerMinute: number
-  allowedTargets: { type: string; addresses?: string[] }
+  allowedTargets: { type: string, addresses?: string[] }
   allowedSelectors: string[]
   webhookUrl: string | null
 }
@@ -55,22 +55,22 @@ export const useApi = () => {
   const get = <T>(path: string) =>
     $fetch<T>(`${base}${path}`, { headers: headers() })
 
-  const post = <T>(path: string, body: unknown) =>
+  const post = <T>(path: string, body: Record<string, unknown>) =>
     $fetch<T>(`${base}${path}`, { method: 'POST', body, headers: headers() })
 
-  const put = <T>(path: string, body: unknown) =>
+  const put = <T>(path: string, body: Record<string, unknown>) =>
     $fetch<T>(`${base}${path}`, { method: 'PUT', body, headers: headers() })
 
   return {
     projects: {
       list: () => get<ProjectSummary[]>('/api/projects'),
       get: (id: string) => get<ProjectDetail>(`/api/projects/${id}`),
-      create: (body: { name: string; chainId: number; forwarderAddress: string }) =>
+      create: (body: { name: string, chainId: number, forwarderAddress: string }) =>
         post<CreateProjectResponse>('/api/projects', body),
-      updateLimits: (id: string, body: Partial<SpendingLimits & { maxGasPriceGwei: number; rateLimitPerMinute: number; webhookUrl: string }>) =>
+      updateLimits: (id: string, body: Partial<SpendingLimits & { maxGasPriceGwei: number, rateLimitPerMinute: number, webhookUrl: string }>) =>
         put<{ status: string }>(`/api/projects/${id}/limits`, body),
       createApiKey: (id: string, name: string) =>
-        post<ApiKeyCreated>(`/api/projects/${id}/api-keys`, { name }),
-    },
+        post<ApiKeyCreated>(`/api/projects/${id}/api-keys`, { name })
+    }
   }
 }

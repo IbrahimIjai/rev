@@ -1,16 +1,30 @@
 @import "tailwindcss";
+@import "@nuxt/ui";
+@import url('https://fonts.googleapis.com/css2?family=Fustat:wght@400;500;600;700;800;900&display=swap');
+
+@theme {
+  --font-sans: 'Fustat', sans-serif;
+}
 
 html {
   font-size: 15px;
 }
 
 body {
-  @apply antialiased font-sans text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-950;
+  @apply antialiased font-sans;
+  color: var(--ui-text);
+  background: var(--ui-bg);
+  color-scheme: light;
   letter-spacing: -0.01em;
 }
 
+.dark body {
+  color-scheme: dark;
+}
+
 h1, h2, h3, h4 {
-  letter-spacing: -0.02em;
+  letter-spacing: -0.03em;
+  font-weight: 800;
 }
 
 ::-webkit-scrollbar {
@@ -20,5 +34,6 @@ h1, h2, h3, h4 {
   @apply bg-transparent;
 }
 ::-webkit-scrollbar-thumb {
-  @apply bg-gray-200 dark:bg-gray-800 rounded-full;
+  background: var(--ui-bg-accented);
+  border-radius: 9999px;
 }

@@ -1,21 +1,28 @@
 export default defineAppConfig({
   ui: {
-    primary: 'orange',
-    gray: 'slate',
+    colors: {
+      primary: 'orange',
+      secondary: 'purple',
+      success: 'green',
+      info: 'blue',
+      warning: 'amber',
+      error: 'red',
+      neutral: 'slate'
+    },
     button: {
-      rounded: 'rounded-xl',
-      default: {
-        size: 'md',
-        color: 'primary',
-        variant: 'solid'
+      slots: {
+        base: 'font-semibold rounded-xl'
       }
     },
     card: {
-      rounded: 'rounded-3xl',
-      shadow: 'shadow-lg'
+      slots: {
+        root: 'rounded-2xl shadow-sm'
+      }
     },
     input: {
-      rounded: 'rounded-xl'
+      slots: {
+        root: 'rounded-xl'
+      }
     }
   }
 })

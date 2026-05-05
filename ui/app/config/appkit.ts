@@ -1,9 +1,9 @@
 import { WagmiAdapter } from '@reown/appkit-adapter-wagmi'
-import { mainnet, arbitrum } from '@reown/appkit/networks'
+import { baseSepolia } from '@reown/appkit/networks'
 
-export const projectId = process.env.NUXT_PROJECT_ID || 'YOUR_PROJECT_ID'
+export const projectId = '43f98c33e7c39797ecd4970c9781666f'
 
-export const networks = [mainnet, arbitrum]
+export const networks = [baseSepolia] as [typeof baseSepolia]
 
 export const wagmiAdapter = new WagmiAdapter({
   networks,

@@ -9,6 +9,7 @@ export const CONFIG = {
     8453: { name: 'Base', symbol: 'ETH', color: 'blue' },
     42161: { name: 'Arbitrum', symbol: 'ETH', color: 'sky' },
     10: { name: 'Optimism', symbol: 'ETH', color: 'red' },
+    5042002: { name: 'Arc Testnet', symbol: 'USDC', color: 'orange' },
   } as Record<number, { name: string; symbol: string; color: string }>,
 
   networkName: (chainId: number): string =>

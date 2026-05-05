@@ -7,12 +7,13 @@ createAppKit({
   networks,
   projectId,
   metadata: {
-    name: 'AppKit Nuxt Wagmi Example',
-    description: 'AppKit Nuxt Wagmi Example',
-    url: 'https://reown.com/appkit',
-    icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4']
-  }
+    name: 'GasRelayer',
+    description: 'Gasless meta-transaction relayer powered by ERC-2771',
+    url: 'https://gasrelayer.xyz',
+    icons: ['https://avatars.githubusercontent.com/u/179229932?s=200&v=4'],
+  },
 })
+
 </script>
 
 <template>

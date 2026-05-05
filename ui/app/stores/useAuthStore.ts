@@ -36,8 +36,5 @@ export const useAuthStore = defineStore('auth', () => {
     }
   }
 
-  // alias kept for layout compatibility
-  const safeAddress = address
-
-  return { address, safeAddress, token, businessId, isConnected, init, setAuth, logout }
+  return { address, token, businessId, isConnected, init, setAuth, logout }
 })
