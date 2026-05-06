@@ -1,15 +1,22 @@
-use crate::models::ForwardRequest;
-use crate::services::{
-    nonce_manager::NonceService,
-    policy::PolicyEnforcer,
-    relay_executor::RelayExecutor,
+use crate::{
+    db::{self, entities::gas_tank, keys::decrypt_key, Db},
+    models::ForwardRequest,
+    services::{
+        nonce_manager::NonceService,
+        policy::PolicyEnforcer,
+        relay_executor::RelayExecutor,
+    },
 };
 use anyhow::{Context, Result};
+use alloy::{
+    primitives::{Bytes, B256, U256},
+    network::Ethereum,
+    signers::local::PrivateKeySigner,
+    transports::Transport,
+    providers::Provider,
+};
 use chrono::Utc;
-use alloy::primitives::{Bytes, B256, U256};
-use alloy::network::Ethereum;
-use alloy::transports::Transport;
-use alloy::providers::Provider;
+use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use std::sync::Arc;
 use std::time::Duration;
 use tokio::{sync::mpsc, time::sleep};
@@ -48,7 +55,6 @@ impl RelayQueue {
     }
 }
 
-#[derive(Debug, Clone)]
 pub struct ProcessorContext<P, T = alloy::transports::BoxTransport>
 where
     P: Provider<T, Ethereum>,
@@ -57,6 +63,25 @@ where
     pub executor: Arc<RelayExecutor<P, T>>,
     pub nonce_service: Arc<NonceService<P, T>>,
     pub policy_enforcer: Arc<PolicyEnforcer>,
+    pub db: Db,
+    pub encryption_secret: String,
+}
+
+// Manual Clone — Db and String are both Clone
+impl<P, T> Clone for ProcessorContext<P, T>
+where
+    P: Provider<T, Ethereum>,
+    T: Transport + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            executor: self.executor.clone(),
+            nonce_service: self.nonce_service.clone(),
+            policy_enforcer: self.policy_enforcer.clone(),
+            db: self.db.clone(),
+            encryption_secret: self.encryption_secret.clone(),
+        }
+    }
 }
 
 pub async fn process_job<P, T>(ctx: &ProcessorContext<P, T>, job: &QueuedJob) -> ProcessResult
@@ -67,31 +92,44 @@ where
     let req = &job.request;
     let sig = &job.signature;
 
-    let relayer_nonce = match ctx
-        .nonce_service
-        .relayer_manager
-        .acquire_nonce(&*ctx.nonce_service.provider)
+    // Look up the active gas tank for this project
+    let tank = match gas_tank::Entity::find()
+        .filter(gas_tank::Column::ProjectId.eq(job.project_id))
+        .filter(gas_tank::Column::Active.eq(true))
+        .one(&ctx.db)
         .await
     {
-        Ok(n) => n,
-        Err(e) => {
-            return ProcessResult::RetryableFailure(format!("failed to acquire nonce: {}", e))
+        Ok(Some(t)) => t,
+        Ok(None) => {
+            return ProcessResult::PermanentFailure(
+                format!("no active gas tank for project {}", job.project_id)
+            )
         }
+        Err(e) => return ProcessResult::RetryableFailure(format!("db error: {e}")),
     };
 
-    let tx_hash = match ctx.executor.submit(req, sig, relayer_nonce).await {
-        Ok(h) => {
-            ctx.nonce_service.relayer_manager.confirm_nonce(relayer_nonce).await;
-            h
-        }
+    // Decrypt the gas tank's private key
+    let privkey_hex = match decrypt_key(&tank.key_reference, &ctx.encryption_secret) {
+        Ok(k) => k,
+        Err(e) => return ProcessResult::PermanentFailure(format!("key decrypt failed: {e}")),
+    };
+
+    let tank_signer: PrivateKeySigner = match privkey_hex.parse() {
+        Ok(s) => s,
+        Err(e) => return ProcessResult::PermanentFailure(format!("invalid private key: {e}")),
+    };
+
+    info!(
+        gas_tank = ?tank_signer.address(),
+        project_id = %job.project_id,
+        "submitting via project gas tank"
+    );
+
+    let tx_hash = match ctx.executor.submit(&tank_signer, req, sig).await {
+        Ok(h) => h,
         Err(e) => {
             warn!(error = %e, "transaction submission failed");
-            let _ = ctx
-                .nonce_service
-                .relayer_manager
-                .reset_from_chain(&*ctx.nonce_service.provider)
-                .await;
-            return ProcessResult::RetryableFailure(format!("submission failed: {}", e));
+            return ProcessResult::RetryableFailure(format!("submission failed: {e}"));
         }
     };
 
@@ -111,9 +149,9 @@ where
         Err(e) => {
             if e.to_string().contains("reverted") {
                 ctx.policy_enforcer.refund_quota(req.from, req.gas).await;
-                ProcessResult::PermanentFailure(format!("reverted: {}", e))
+                ProcessResult::PermanentFailure(format!("reverted: {e}"))
             } else {
-                ProcessResult::RetryableFailure(format!("confirmation failed: {}", e))
+                ProcessResult::RetryableFailure(format!("confirmation failed: {e}"))
             }
         }
     }

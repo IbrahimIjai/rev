@@ -1,2 +1,9 @@
 target
 .env
+.env.*
+!.env.example
+
+# Foundry build artifacts (each subdir has its own .gitignore too)
+contracts/out/
+contracts/cache/
+contracts/lib/

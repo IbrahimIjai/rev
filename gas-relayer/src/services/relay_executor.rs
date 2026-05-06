@@ -3,7 +3,7 @@ use anyhow::{Context, Result};
 use alloy::{
     consensus::{SignableTransaction, TxEip1559, TxEnvelope},
     eips::eip2718::Encodable2718,
-    network::{Ethereum, TransactionBuilder},
+    network::Ethereum,
     primitives::{Address, Bytes, TxKind, B256, U256},
     providers::Provider,
     rpc::types::eth::{TransactionReceipt, TransactionRequest},
@@ -17,8 +17,6 @@ use std::time::Duration;
 use tokio::time::timeout;
 use tracing::{info, warn};
 
-/// Bindings for OZ ERC2771Forwarder.
-/// execute() takes a single ForwardRequestData struct that includes the signature.
 sol! {
     #[sol(rpc)]
     interface IERC2771Forwarder {
@@ -61,19 +59,17 @@ pub struct RelayExecutorConfig {
     pub max_gas_price_gwei: u64,
 }
 
+/// Stateless executor — no signer stored here.
+/// The gas tank signer is passed per-job so each project pays from its own tank.
 pub struct RelayExecutor<P, T = alloy::transports::BoxTransport> {
     pub provider: Arc<P>,
-    signer: PrivateKeySigner,
     config: RelayExecutorConfig,
     _marker: std::marker::PhantomData<T>,
 }
 
 impl<P, T> std::fmt::Debug for RelayExecutor<P, T> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RelayExecutor")
-            .field("config", &self.config)
-            .field("relayer_address", &self.signer.address())
-            .finish()
+        f.debug_struct("RelayExecutor").field("config", &self.config).finish()
     }
 }
 
@@ -82,24 +78,29 @@ where
     P: Provider<T, Ethereum>,
     T: Transport + Clone,
 {
-    pub fn new(provider: Arc<P>, signer: PrivateKeySigner, config: RelayExecutorConfig) -> Self {
-        Self { provider, signer, config, _marker: std::marker::PhantomData }
+    pub fn new(provider: Arc<P>, config: RelayExecutorConfig) -> Self {
+        Self { provider, config, _marker: std::marker::PhantomData }
     }
 
-    pub fn relayer_address(&self) -> Address {
-        self.signer.address()
-    }
-
+    /// Submit a relay tx signed by the project's gas tank.
+    /// Nonce is fetched from chain so each gas tank address is independent.
     pub async fn submit(
         &self,
+        signer: &PrivateKeySigner,
         req: &ForwardRequestModel,
         signature: &[u8],
-        nonce: u64,
     ) -> Result<B256> {
         let calldata = encode_execute_call(req, signature)?;
 
+        // Fetch gas tank's pending nonce directly from chain
+        let nonce = self.provider
+            .get_transaction_count(signer.address())
+            .pending()
+            .await
+            .context("failed to fetch gas tank nonce")?;
+
         let tx_est = TransactionRequest::default()
-            .from(self.signer.address())
+            .from(signer.address())
             .to(self.config.forwarder_address)
             .input(calldata.clone().into());
 
@@ -129,8 +130,6 @@ where
             self.config.max_gas_price_gwei
         );
 
-        // Build typed EIP-1559 tx, sign locally, send raw —
-        // public RPCs reject unsigned eth_sendTransaction.
         let mut typed_tx = TxEip1559 {
             chain_id: self.config.chain_id,
             nonce,
@@ -143,7 +142,7 @@ where
             access_list: Default::default(),
         };
 
-        let sig = self.signer
+        let sig = signer
             .sign_hash_sync(&typed_tx.signature_hash())
             .context("failed to sign transaction")?;
 
@@ -156,7 +155,7 @@ where
             .context("failed to submit transaction")?;
 
         let tx_hash = *pending.tx_hash();
-        info!(tx_hash = ?tx_hash, "transaction submitted");
+        info!(tx_hash = ?tx_hash, gas_tank = ?signer.address(), "transaction submitted");
         Ok(tx_hash)
     }
 

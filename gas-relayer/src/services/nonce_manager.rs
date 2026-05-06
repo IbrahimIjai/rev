@@ -121,7 +121,6 @@ impl RelayerNonceManager {
 
 pub struct NonceService<P, T = alloy::transports::BoxTransport> {
     pub user_cache: Arc<UserNonceCache>,
-    pub relayer_manager: Arc<RelayerNonceManager>,
     pub provider: Arc<P>,
     forwarder_address: Address,
     chain_id: u64,
@@ -142,12 +141,10 @@ where
     pub fn new(
         provider: Arc<P>,
         forwarder_address: Address,
-        relayer_address: Address,
         chain_id: u64,
     ) -> Self {
         Self {
             user_cache: Arc::new(UserNonceCache::new(30)),
-            relayer_manager: Arc::new(RelayerNonceManager::new(relayer_address, chain_id)),
             provider,
             forwarder_address,
             chain_id,

@@ -1,3 +1,6 @@
+# Dependencies — install with `forge install`
+lib/
+
 # Compiler files
 cache/
 out/

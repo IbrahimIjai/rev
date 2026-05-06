@@ -36,7 +36,6 @@ use axum::{
 };
 use alloy::{
     providers::ProviderBuilder,
-    signers::local::PrivateKeySigner,
     primitives::{Address, U256},
 };
 use sea_orm_migration::MigratorTrait;
@@ -111,9 +110,6 @@ async fn main() -> Result<()> {
     );
     info!(rpc_url = %rpc_url, chain_id, "connected to RPC");
 
-    let signer: PrivateKeySigner = private_key.parse().context("invalid private key")?;
-    info!(relayer = ?signer.address(), "relayer wallet loaded");
-
     let forwarder_addr = Address::from_str(&forwarder_address).context("invalid forwarder address")?;
 
     // ── EIP-712 verifier (matches OZ ERC2771Forwarder domain) ────────────────
@@ -130,14 +126,12 @@ async fn main() -> Result<()> {
     let nonce_service = Arc::new(NonceService::new(
         provider.clone(),
         forwarder_addr,
-        signer.address(),
         chain_id,
     ));
 
     // ── Relay executor ────────────────────────────────────────────────────────
     let executor = Arc::new(RelayExecutor::new(
         provider.clone(),
-        signer.clone(),
         RelayExecutorConfig {
             forwarder_address: forwarder_addr,
             chain_id,
@@ -160,7 +154,7 @@ async fn main() -> Result<()> {
         active: true,
         allowed_selectors: vec![],
         rate_limit_per_user_per_minute: 10,
-        relayer_address: signer.address(),
+        relayer_address: Address::ZERO,
     };
     let policy_enforcer = Arc::new(PolicyEnforcer::new(default_policy));
 
@@ -172,6 +166,8 @@ async fn main() -> Result<()> {
         executor: executor.clone(),
         nonce_service: nonce_service.clone(),
         policy_enforcer,
+        db: database.clone(),
+        encryption_secret: encryption_secret.clone(),
     });
     spawn_worker_pool(receiver, processor_ctx, 4).await;
 
