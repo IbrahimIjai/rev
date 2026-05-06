@@ -7,18 +7,11 @@ use alloy::{
 use anyhow::{Context, Result};
 use serde::Deserialize;
 
-// ── Config ───────────────────────────────────────────────────────────────────
-
 const RELAYER_URL: &str = "http://localhost:8080";
 const CHAIN_ID: u64 = 84532;
-
 const NFT_ADDRESS: &str = "0xBe9ec79854e459F38E0B868A0c3429AAbf6784b2";
-
-// Paste your keys here:
 const PRIVATE_KEY: &str = "0xa9abdb067cab927e7d71167429ba99b789737ab631593fe2bb346bd8f265debb";
 const API_KEY: &str = "pk_live_f4efae493567845d4bbe921d4aa62fa20096d08bd992c4ad";
-
-// ── EIP-712 type (must match relayer's ForwardRequest exactly) ───────────────
 
 sol! {
     #[derive(Debug, Default)]
@@ -32,8 +25,6 @@ sol! {
         bytes data;
     }
 }
-
-// ── Response types ───────────────────────────────────────────────────────────
 
 #[derive(Deserialize)]
 struct NonceResp {
@@ -62,13 +53,10 @@ struct JobResp {
     error: Option<String>,
 }
 
-// ── Main ─────────────────────────────────────────────────────────────────────
-
 #[tokio::main]
 async fn main() -> Result<()> {
     let client = reqwest::Client::new();
 
-    // Parse private key → wallet address
     let signer: PrivateKeySigner = PRIVATE_KEY.parse().context("invalid private key")?;
     let user = signer.address();
     println!("Wallet:  {user}");
@@ -76,7 +64,6 @@ async fn main() -> Result<()> {
     println!("Network: Base Sepolia ({})", CHAIN_ID);
     println!();
 
-    // 1. Fetch nonce from forwarder
     let nonce_resp: NonceResp = client
         .get(format!("{RELAYER_URL}/nonce/{CHAIN_ID}/{user}"))
         .send()
@@ -88,7 +75,6 @@ async fn main() -> Result<()> {
     let nonce = U256::from_str_radix(&nonce_hex, 16).context("invalid nonce")?;
     println!("Nonce:   {nonce}");
 
-    // 2. Fetch EIP-712 domain from relayer
     let domain_resp: DomainResp = client
         .get(format!("{RELAYER_URL}/domain/{CHAIN_ID}"))
         .send()
@@ -108,11 +94,10 @@ async fn main() -> Result<()> {
         salt: None,
     };
 
-    // 3. Build ForwardRequest for mint() — selector 0x1249c58b
     let deadline = std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)?
         .as_secs()
-        + 3600; // valid for 1 hour
+        + 3600;
 
     let nft: Address = NFT_ADDRESS.parse()?;
 
@@ -123,10 +108,9 @@ async fn main() -> Result<()> {
         gas: U256::from(200_000u64),
         nonce,
         deadline,
-        data: Bytes::from_static(&[0x12, 0x49, 0xc5, 0x8b]), // mint()
+        data: Bytes::from_static(&[0x12, 0x49, 0xc5, 0x8b]),
     };
 
-    // 4. Sign EIP-712
     let signing_hash = req.eip712_signing_hash(&domain);
     let sig = signer.sign_hash_sync(&signing_hash)?;
     let sig_hex = format!("0x{}", alloy::hex::encode(sig.as_bytes()));
@@ -134,20 +118,14 @@ async fn main() -> Result<()> {
     println!("Sig:     {}...{}", &sig_hex[..10], &sig_hex[sig_hex.len() - 8..]);
     println!();
 
-    // 5. Submit to relayer
-    // U256 values sent as hex strings ("0x...") — that's what alloy's serde expects on the other end
-    let nonce_str = format!("0x{nonce:x}");
-    let gas_str = format!("0x{:x}", 200_000u64);
-    let user_str = format!("{user:?}");   // "0x..." checksummed
-
     let payload = serde_json::json!({
         "request": {
-            "from":     user_str,
+            "from":     format!("{user:?}"),
             "to":       NFT_ADDRESS,
             "value":    "0x0",
-            "gas":      gas_str,
-            "nonce":    nonce_str,
-            "deadline": deadline,       // plain u64 number
+            "gas":      format!("0x{:x}", 200_000u64),
+            "nonce":    format!("0x{nonce:x}"),
+            "deadline": deadline,
             "data":     "0x1249c58b"
         },
         "signature": sig_hex,
@@ -171,48 +149,40 @@ async fn main() -> Result<()> {
     println!("Job ID:  {}", relay.job_id);
     println!();
 
-    // 6. Poll until confirmed (fall back to wallet link if status endpoint returns 404)
-    println!("Waiting for on-chain confirmation (~15s)...");
-    let mut confirmed = false;
-    for _ in 0..20 {
-        tokio::time::sleep(tokio::time::Duration::from_secs(3)).await;
+    println!("Waiting for on-chain confirmation...");
+    for _ in 0..30 {
+        tokio::time::sleep(tokio::time::Duration::from_millis(1000)).await;
+        print!(".");
+        std::io::Write::flush(&mut std::io::stdout())?;
 
         let resp = client
             .get(format!("{RELAYER_URL}/relay/{}", relay.job_id))
             .send()
             .await?;
 
-        // Job status endpoint may not be fully implemented yet — treat 404 as "still pending"
         if resp.status() == 404 {
-            print!(".");
-            std::io::Write::flush(&mut std::io::stdout())?;
             continue;
         }
 
         let job: JobResp = resp.json().await.context("invalid job response")?;
-        println!("\n  Status: {}", job.status);
 
         match job.status.as_str() {
             "confirmed" => {
                 let tx = job.tx_hash.unwrap_or_default();
                 println!();
+                println!();
                 println!("✓ NFT minted!");
                 println!("  https://base-sepolia.blockscout.com/tx/{tx}");
-                confirmed = true;
-                break;
+                return Ok(());
             }
-            "failed" | "reverted" => {
+            "failed" => {
+                println!();
                 anyhow::bail!("relay failed: {}", job.error.unwrap_or_default());
             }
             _ => {}
         }
     }
 
-    if !confirmed {
-        println!();
-        println!("✓ Relay job accepted — check your wallet on Blockscout:");
-        println!("  https://base-sepolia.blockscout.com/address/{user}#nfts");
-    }
-
-    Ok(())
+    println!();
+    anyhow::bail!("timed out waiting for confirmation — check job {} manually", relay.job_id);
 }

@@ -2,12 +2,13 @@ services:
   ui:
     build:
       context: ./ui
+      args:
+        - TARGETPLATFORM=linux/amd64
+    platform: linux/amd64
     ports:
       - "3000:3000"
-    environment:
-      - NUXT_PUBLIC_API_URL=http://localhost:8080
-      - NUXT_PROJECT_ID=${NUXT_PROJECT_ID}
-      - NUXT_PUBLIC_NETWORK=${NUXT_PUBLIC_NETWORK:-mainnet}
+    env_file:
+      - ./ui/.env
     depends_on:
       - relayer
     restart: unless-stopped
@@ -22,10 +23,10 @@ services:
       - PORT=8080
       - CHAIN_ID=${CHAIN_ID:-84532}
       - RPC_URL=${RPC_URL:-https://sepolia.base.org}
-      - FORWARDER_ADDRESS=${FORWARDER_ADDRESS}
+      - FORWARDER_ADDRESS=${FORWARDER_ADDRESS:-0xDb78D27B530ed9c0fC582f53b558b75c5ab63A90}
       - DOMAIN_NAME=${DOMAIN_NAME:-GasRelayForwarder}
       - JWT_SECRET=${JWT_SECRET:-change-me-in-production}
-      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:-change-me-in-production-32bytes!}
+      - ENCRYPTION_SECRET=${ENCRYPTION_SECRET:-change-me-in-production-32chars!}
       - DATABASE_URL=postgresql://relayer:relayer@postgres:5432/gas_relayer
       - REDIS_URL=redis://redis:6379
       - RUST_LOG=gas_relayer=info,tower_http=info

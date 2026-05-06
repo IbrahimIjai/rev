@@ -1,6 +1,7 @@
 use crate::{
     db::{self, entities::gas_tank, keys::decrypt_key, Db},
-    models::ForwardRequest,
+    handlers::relay::JobStore,
+    models::{ForwardRequest, JobStatus, JobStatusResponse},
     services::{
         nonce_manager::NonceService,
         policy::PolicyEnforcer,
@@ -65,6 +66,7 @@ where
     pub policy_enforcer: Arc<PolicyEnforcer>,
     pub db: Db,
     pub encryption_secret: String,
+    pub job_store: JobStore,
 }
 
 // Manual Clone — Db and String are both Clone
@@ -80,6 +82,7 @@ where
             policy_enforcer: self.policy_enforcer.clone(),
             db: self.db.clone(),
             encryption_secret: self.encryption_secret.clone(),
+            job_store: self.job_store.clone(),
         }
     }
 }
@@ -179,9 +182,23 @@ pub async fn run_worker<P, T>(
 {
     while let Some(job) = receiver.recv().await {
         info!(worker = worker_id, job_id = %job.id, "processing job");
+        ctx.job_store.insert(job.id, JobStatusResponse {
+            job_id: job.id,
+            status: JobStatus::Processing,
+            tx_hash: None,
+            block_number: None,
+            error: None,
+        });
         match process_job(&ctx, &job).await {
-            ProcessResult::Success { tx_hash, .. } => {
+            ProcessResult::Success { tx_hash, block_number, .. } => {
                 info!(job_id = %job.id, tx_hash = ?tx_hash, "job confirmed");
+                ctx.job_store.insert(job.id, JobStatusResponse {
+                    job_id: job.id,
+                    status: JobStatus::Confirmed,
+                    tx_hash: Some(tx_hash),
+                    block_number,
+                    error: None,
+                });
             }
             ProcessResult::RetryableFailure(reason) => {
                 let attempts = job.attempts + 1;
@@ -201,10 +218,24 @@ pub async fn run_worker<P, T>(
                     });
                 } else {
                     error!(job_id = %job.id, "max retries reached: {}", reason);
+                    ctx.job_store.insert(job.id, JobStatusResponse {
+                        job_id: job.id,
+                        status: JobStatus::Failed,
+                        tx_hash: None,
+                        block_number: None,
+                        error: Some(reason),
+                    });
                 }
             }
             ProcessResult::PermanentFailure(reason) => {
                 error!(job_id = %job.id, "job permanently failed: {}", reason);
+                ctx.job_store.insert(job.id, JobStatusResponse {
+                    job_id: job.id,
+                    status: JobStatus::Failed,
+                    tx_hash: None,
+                    block_number: None,
+                    error: Some(reason),
+                });
             }
         }
     }

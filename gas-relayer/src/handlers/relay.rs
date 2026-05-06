@@ -1,7 +1,7 @@
 use crate::{
     crypto::eip712::Eip712Verifier,
     db::{self, entities::{api_key, spending_limit}, hash_api_key, Db},
-    models::{JobStatus, RelayPayload, RelayResponse},
+    models::{JobStatus, JobStatusResponse, RelayPayload, RelayResponse},
     services::{
         nonce_manager::NonceService,
         policy::{AllowedTargets, Policy, PolicyEnforcer},
@@ -21,11 +21,14 @@ use axum::{
     Json,
 };
 use chrono::Utc;
+use dashmap::DashMap;
 use sea_orm::{ColumnTrait, EntityTrait, QueryFilter};
 use serde::Serialize;
 use std::{collections::HashSet, str::FromStr, sync::Arc};
 use tracing::error;
 use uuid::Uuid;
+
+pub type JobStore = Arc<DashMap<Uuid, JobStatusResponse>>;
 
 #[derive(Debug, Clone)]
 pub struct AppState<P, T = alloy::transports::BoxTransport>
@@ -37,6 +40,7 @@ where
     pub nonce_service: Arc<NonceService<P, T>>,
     pub relay_queue: Arc<RelayQueue>,
     pub db: Db,
+    pub job_store: JobStore,
 }
 
 #[derive(Debug, Serialize)]
@@ -248,18 +252,21 @@ where
 }
 
 pub async fn job_status_handler<P, T>(
-    State(_state): State<AppState<P, T>>,
+    State(state): State<AppState<P, T>>,
     Path(job_id): Path<Uuid>,
 ) -> impl IntoResponse
 where
     P: Provider<T, Ethereum>,
     T: Transport + Clone,
 {
-    (
-        StatusCode::NOT_FOUND,
-        Json(ErrorResponse::new("JOB_NOT_FOUND", format!("job {} not found", job_id))),
-    )
-        .into_response()
+    match state.job_store.get(&job_id) {
+        Some(result) => (StatusCode::OK, Json(result.clone())).into_response(),
+        None => (
+            StatusCode::NOT_FOUND,
+            Json(ErrorResponse::new("JOB_NOT_FOUND", format!("job {} not found", job_id))),
+        )
+            .into_response(),
+    }
 }
 
 pub async fn get_nonce_handler<P, T>(

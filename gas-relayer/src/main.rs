@@ -17,7 +17,7 @@ use crate::{
         },
         relay::{
             domain_handler, get_nonce_handler, health_handler, job_status_handler, relay_handler,
-            AppState,
+            AppState, JobStore,
         },
     },
     models::Eip712Domain,
@@ -38,6 +38,7 @@ use alloy::{
     providers::ProviderBuilder,
     primitives::{Address, U256},
 };
+use dashmap::DashMap;
 use sea_orm_migration::MigratorTrait;
 use std::sync::Arc;
 use std::str::FromStr;
@@ -162,12 +163,15 @@ async fn main() -> Result<()> {
     let (queue, receiver) = RelayQueue::new(1000);
     let queue = Arc::new(queue);
 
+    let job_store: JobStore = Arc::new(DashMap::new());
+
     let processor_ctx = Arc::new(ProcessorContext {
         executor: executor.clone(),
         nonce_service: nonce_service.clone(),
         policy_enforcer,
         db: database.clone(),
         encryption_secret: encryption_secret.clone(),
+        job_store: job_store.clone(),
     });
     spawn_worker_pool(receiver, processor_ctx, 4).await;
 
@@ -177,6 +181,7 @@ async fn main() -> Result<()> {
         nonce_service,
         relay_queue: queue,
         db: database.clone(),
+        job_store,
     };
 
     let auth_state = AuthState {

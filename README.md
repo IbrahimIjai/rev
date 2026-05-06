@@ -26,9 +26,7 @@ Reading about these things is one thing. Implementing them from scratch — the 
 
 ## Demo
 
-> 📹 **Demo video coming soon**
->
-> _[Placeholder — will show: creating a project, funding a gas tank, running the Rust minter script, watching a gasless NFT mint land on Blockscout]_
+<video src="ui/public/demo-fast.mp4" controls width="100%"></video>
 
 ---
 
