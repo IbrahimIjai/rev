@@ -2,11 +2,6 @@
 
 A production-grade ERC-2771 meta-transaction relayer — let your users transact on-chain without ever holding ETH.
 
-```bash
-docker compose up --build
-# UI → http://localhost:3000  |  Relayer API → http://localhost:8080
-```
-
 ---
 
 ## About
@@ -96,6 +91,12 @@ zero/gas-relayer/
 ---
 
 ## How the Relayer Works
+
+```bash
+docker compose up --build
+# UI → http://localhost:3000  |  Relayer API → http://localhost:8080
+```
+
 
 ### The Gasless Flow
 
