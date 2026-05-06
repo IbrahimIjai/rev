@@ -1,0 +1,43 @@
+# config.yaml — Gas Relayer configuration
+# Environment variables override these values.
+# Prefix env vars with RELAYER__ (double underscore as separator)
+# e.g. RELAYER__SERVER__PORT=9090
+
+server:
+  host: "0.0.0.0"
+  port: 8080
+  allowed_origins:
+    - "https://yourdapp.com"
+    - "https://app.yourdapp.com"
+  max_body_size: 1048576  # 1MB
+
+chains:
+  # Base Sepolia
+  - chain_id: 84532
+    name: "Base Sepolia"
+    rpc_url: "https://sepolia.base.org"
+    forwarder_address: "0x3BaF50F4152Bb2C3F0E27693600c6C6c56D9D0E7"
+    domain_name: "GasRelayForwarder"
+    domain_version: "1"
+    max_gas_price_gwei: 50
+    confirmations: 1
+    confirmation_timeout_secs: 60
+
+relayer:
+  # In production: leave empty and use KMS_KEY_ARN or VAULT_KEY_PATH
+  # private_key: set via RELAYER_PRIVATE_KEY env var
+  worker_count: 4
+  queue_capacity: 1000
+
+database:
+  url: "postgresql://relayer:relayer@localhost:5432/gas_relayer"
+  max_connections: 20
+  min_connections: 2
+
+redis:
+  url: "redis://localhost:6379"
+
+policy:
+  default_daily_gas_quota: 5000000       # 5M gas units per user per day
+  default_max_gas_per_request: 500000    # 500k max per single request
+  default_rate_limit_per_minute: 10      # 10 requests per user per minute

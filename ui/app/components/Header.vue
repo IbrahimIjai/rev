@@ -12,6 +12,7 @@ const links = [
   { label: 'Overview', to: '/' },
   { label: 'Projects', to: '/projects' },
   { label: 'Gas Tanks', to: '/tanks' },
+  { label: 'Docs', to: '/docs' },
   { label: 'Settings', to: '/settings' }
 ]
 

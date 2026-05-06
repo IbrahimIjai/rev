@@ -1,4 +1,6 @@
 <script setup lang="ts">
+import { useBalance } from '@wagmi/vue'
+import { formatEther } from 'viem'
 import { CONFIG } from '~/lib/config'
 
 const route = useRoute()
@@ -83,6 +85,24 @@ async function copyText(text: string) {
   await navigator.clipboard.writeText(text)
   toast.add({ title: 'Copied', color: 'success' })
 }
+
+// ─── Gas tank balance ─────────────────────────────────────────────────────────
+const gasTankAddress = computed(() => project.value?.gasTankAddress as `0x${string}` | undefined)
+const { data: tankBalance, refetch: refetchBalance } = useBalance({
+  address: gasTankAddress,
+  chainId: 84532,
+})
+const tankEth = computed(() => {
+  if (!tankBalance.value?.value) return null
+  return Number(formatEther(tankBalance.value.value)).toFixed(4)
+})
+const tankColor = computed(() => {
+  const v = Number(tankEth.value)
+  if (!tankEth.value) return 'neutral'
+  if (v === 0) return 'error'
+  if (v < 0.01) return 'warning'
+  return 'success'
+})
 </script>
 
 <template>
@@ -210,6 +230,16 @@ async function copyText(text: string) {
               <UButton icon="i-heroicons-document-duplicate" color="neutral" variant="ghost" size="xs" @click="copyText(project.gasTankAddress!)" />
             </div>
             <div v-else class="text-xs text-dimmed italic">Not provisioned</div>
+            <div class="flex items-center justify-between pt-1">
+              <span class="text-xs text-dimmed">Balance</span>
+              <div class="flex items-center gap-1.5">
+                <span v-if="tankEth !== null" class="text-xs font-semibold" :class="`text-${tankColor}`">
+                  {{ tankEth }} ETH
+                </span>
+                <span v-else class="text-xs text-dimmed">—</span>
+                <UButton icon="i-heroicons-arrow-path" color="neutral" variant="ghost" size="xs" @click="refetchBalance()" />
+              </div>
+            </div>
           </div>
         </div>
 

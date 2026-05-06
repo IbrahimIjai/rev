@@ -7,6 +7,7 @@ export const CONFIG = {
     11155111: { name: 'Sepolia', symbol: 'ETH', color: 'violet' },
     137: { name: 'Polygon', symbol: 'MATIC', color: 'purple' },
     8453: { name: 'Base', symbol: 'ETH', color: 'blue' },
+    84532: { name: 'Base Sepolia', symbol: 'ETH', color: 'blue' },
     42161: { name: 'Arbitrum', symbol: 'ETH', color: 'sky' },
     10: { name: 'Optimism', symbol: 'ETH', color: 'red' },
     5042002: { name: 'Arc Testnet', symbol: 'USDC', color: 'orange' },

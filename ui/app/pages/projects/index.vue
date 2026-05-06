@@ -16,16 +16,11 @@ const { data: projects, pending, refresh } = useAsyncData(
 // ─── Create project modal ────────────────────────────────────────────────────
 const showCreate = ref(false)
 const creating = ref(false)
-const newProject = reactive({ name: '', chainId: 1, forwarderAddress: '' })
+const newProject = reactive({ name: '', chainId: 84532, forwarderAddress: '' })
 
 // Newly created project result — shown once in a reveal modal
 const createdResult = ref<CreateProjectResponse | null>(null)
 const showResult = ref(false)
-
-const chainOptions = Object.entries(CONFIG.NETWORKS).map(([id, n]) => ({
-  label: n.name,
-  value: Number(id),
-}))
 
 async function createProject() {
   if (!newProject.name || !newProject.forwarderAddress) return
@@ -161,7 +156,11 @@ async function copyText(text: string, label: string) {
 
           <div class="space-y-1.5">
             <label class="text-xs font-semibold text-muted uppercase tracking-wide">Network</label>
-            <USelect v-model="newProject.chainId" :items="chainOptions" size="md" />
+            <div class="flex items-center gap-2 px-3 py-2 rounded-md border border-default bg-elevated">
+              <UIcon name="i-heroicons-signal" class="w-4 h-4 text-blue-400 shrink-0" />
+              <span class="text-sm font-medium">Base Sepolia</span>
+              <UBadge label="Testnet" color="blue" variant="subtle" size="xs" class="ml-auto" />
+            </div>
           </div>
 
           <div class="space-y-1.5">

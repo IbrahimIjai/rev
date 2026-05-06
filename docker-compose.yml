@@ -3,20 +3,15 @@ version: "3.9"
 services:
   relayer:
     build:
-      context: .
-      dockerfile: Dockerfile
+      context: ./gas-relayer
     ports:
       - "8080:8080"
     environment:
-      - CHAIN_ID=1
-      - RPC_URL=http://anvil:8545
-      - FORWARDER_ADDRESS=0x5FbDB2315678afecb367f032d93F642f64180aa3
-      - RELAYER_PRIVATE_KEY=${RELAYER_PRIVATE_KEY}
-      - DOMAIN_NAME=GasRelayer
-      - DATABASE_URL=postgresql://relayer:relayer@postgres:5432/gas_relayer
-      - REDIS_URL=redis://redis:6379
-      - HOST=0.0.0.0
-      - PORT=8080
+      - RELAYER__SERVER__HOST=0.0.0.0
+      - RELAYER__SERVER__PORT=8080
+      - RELAYER__RELAYER__PRIVATE_KEY=${RELAYER_PRIVATE_KEY}
+      - RELAYER__DATABASE__URL=postgresql://relayer:relayer@postgres:5432/gas_relayer
+      - RELAYER__REDIS__URL=redis://redis:6379
       - RUST_LOG=gas_relayer=debug,tower_http=info
     depends_on:
       postgres:
@@ -33,7 +28,6 @@ services:
       POSTGRES_DB: gas_relayer
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./migrations:/docker-entrypoint-initdb.d
     ports:
       - "5432:5432"
     healthcheck:
@@ -54,7 +48,6 @@ services:
     volumes:
       - redis_data:/data
 
-  # Local Ethereum node for development
   anvil:
     image: ghcr.io/foundry-rs/foundry:latest
     command: ["anvil", "--host", "0.0.0.0", "--port", "8545", "--chain-id", "31337", "--block-time", "2"]

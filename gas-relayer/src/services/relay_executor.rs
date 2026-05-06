@@ -1,13 +1,15 @@
 use crate::models::ForwardRequest as ForwardRequestModel;
 use anyhow::{Context, Result};
 use alloy::{
-    providers::Provider,
-    signers::local::PrivateKeySigner,
+    consensus::{SignableTransaction, TxEip1559, TxEnvelope},
+    eips::eip2718::Encodable2718,
     network::{Ethereum, TransactionBuilder},
-    primitives::{Address, B256, U256, Bytes},
+    primitives::{Address, Bytes, TxKind, B256, U256},
+    providers::Provider,
+    rpc::types::eth::{TransactionReceipt, TransactionRequest},
+    signers::{local::PrivateKeySigner, SignerSync},
     sol,
     sol_types::SolCall,
-    rpc::types::eth::{TransactionRequest, TransactionReceipt},
     transports::Transport,
 };
 use std::sync::Arc;
@@ -127,20 +129,29 @@ where
             self.config.max_gas_price_gwei
         );
 
-        let tx = TransactionRequest::default()
-            .from(self.signer.address())
-            .to(self.config.forwarder_address)
-            .input(calldata.into())
-            .gas_limit(gas_limit_with_buffer)
-            .max_fee_per_gas(fees.max_fee_per_gas)
-            .max_priority_fee_per_gas(fees.max_priority_fee_per_gas)
-            .nonce(nonce)
-            .value(req.value)
-            .with_chain_id(self.config.chain_id);
+        // Build typed EIP-1559 tx, sign locally, send raw —
+        // public RPCs reject unsigned eth_sendTransaction.
+        let mut typed_tx = TxEip1559 {
+            chain_id: self.config.chain_id,
+            nonce,
+            gas_limit: gas_limit_with_buffer,
+            max_fee_per_gas: fees.max_fee_per_gas,
+            max_priority_fee_per_gas: fees.max_priority_fee_per_gas,
+            to: TxKind::Call(self.config.forwarder_address),
+            value: req.value,
+            input: calldata,
+            access_list: Default::default(),
+        };
+
+        let sig = self.signer
+            .sign_hash_sync(&typed_tx.signature_hash())
+            .context("failed to sign transaction")?;
+
+        let raw = TxEnvelope::Eip1559(typed_tx.into_signed(sig)).encoded_2718();
 
         let pending = self
             .provider
-            .send_transaction(tx)
+            .send_raw_transaction(&raw)
             .await
             .context("failed to submit transaction")?;
 
@@ -151,12 +162,16 @@ where
 
     pub async fn wait_for_confirmation(&self, tx_hash: B256) -> Result<TransactionReceipt> {
         let timeout_duration = Duration::from_secs(self.config.confirmation_timeout_secs);
+        let poll_interval = Duration::from_secs(2);
 
         let receipt = timeout(timeout_duration, async {
-            self.provider
-                .get_transaction_receipt(tx_hash)
-                .await?
-                .ok_or_else(|| anyhow::anyhow!("transaction not found"))
+            loop {
+                match self.provider.get_transaction_receipt(tx_hash).await {
+                    Ok(Some(r)) => return Ok(r),
+                    Ok(None) => tokio::time::sleep(poll_interval).await,
+                    Err(e) => return Err(anyhow::anyhow!("rpc error: {e}")),
+                }
+            }
         })
         .await
         .context("confirmation timeout")?

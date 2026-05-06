@@ -2,6 +2,7 @@
 name = "gas-relayer"
 version = "0.1.0"
 edition = "2021"
+default-run = "gas-relayer"
 authors = ["Your Team"]
 description = "Production-grade ERC-2771 meta-transaction gas relayer"
 
