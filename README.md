@@ -26,7 +26,7 @@ Reading about these things is one thing. Implementing them from scratch — the 
 
 ## Demo
 
-<video src="https://raw.githubusercontent.com/IbrahimIjai/rev/main/ui/public/demo-fast.mp4" controls width="100%" height="400"></video>
+![Demo](https://raw.githubusercontent.com/IbrahimIjai/rev/main/ui/public/demo.gif)
 
 ---
 
